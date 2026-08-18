@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Philo VLP — Panel de Control de Reparaciones</title>
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+</head>
+<body>
+<div class="wrap">
+
+  <div id="loadingBanner"><span class="dot"></span> Cargando datos del dashboard (data/datos.json)…</div>
+
+  <div id="errorBanner">
+    <h3>No se pudieron cargar los datos</h3>
+    <p>El dashboard no pudo leer <code>data/datos.json</code> mediante <code>fetch()</code>. Esto casi siempre ocurre por uno de estos motivos:</p>
+    <p>&bull; Abriste <code>index.html</code> con doble clic (protocolo <code>file://</code>), lo cual bloquea <code>fetch()</code> por política del navegador. Solución: publica en GitHub Pages o corre un servidor local (ver README.md).</p>
+    <p>&bull; El archivo <code>data/datos.json</code> no existe en esa ruta o el JSON está corrupto.</p>
+    <span class="error-detail"></span>
+  </div>
+
+
+
+  <header>
+    <div>
+      <div class="brand-eyebrow">Línea de reparación · Philo VLP</div>
+      <h1>Panel de Reparaciones <span>/ Serial Number Fusion</span></h1>
+      <div class="subtitle">Fusión de <b style="color:var(--text)">RepairedByDateShiftModel</b> (intake por turno) y <b style="color:var(--text)">PhiloVLP_RepairDetail</b> (detalle de fallas) por Serial Number / Unit SN.</div>
+    </div>
+    <div class="date-range">
+      <b id="dateRangeLbl">—</b>
+      Ventana de datos analizada
+    </div>
+  </header>
+
+  <!-- SIGNATURE MERGE FLOW -->
+  <div class="flow">
+    <div class="flow-node a">
+      <div class="lbl">Archivo A · Intake</div>
+      <div class="val" id="flowA">—</div>
+      <div class="sub">seriales únicos</div>
+    </div>
+    <div class="flow-arrow">⋈<small>SN match</small></div>
+    <div class="flow-node b">
+      <div class="lbl">Archivo B · Detalle</div>
+      <div class="val" id="flowB">—</div>
+      <div class="sub">seriales únicos</div>
+    </div>
+    <div class="flow-arrow">→<small>fusión</small></div>
+    <div class="flow-node c">
+      <div class="lbl">Coincidencias exactas</div>
+      <div class="val" id="flowC">—</div>
+      <div class="sub">seriales en ambos archivos (<span id="flowCPct">—</span>)</div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi"><div class="lbl">Eventos de intake</div><div class="num" id="kpi1">—</div><div class="delta">RepairedByDateShiftModel</div></div>
+    <div class="kpi"><div class="lbl">Eventos de detalle</div><div class="num" id="kpi2">—</div><div class="delta">PhiloVLP RepairDetail</div></div>
+    <div class="kpi"><div class="lbl">Unidades únicas totales</div><div class="num" id="kpi3">—</div><div class="delta">Universo combinado</div></div>
+    <div class="kpi cyan"><div class="lbl">Aging promedio</div><div class="num" id="kpi4">—</div><div class="delta">días en proceso</div></div>
+    <div class="kpi amber"><div class="lbl">Repair Count prom.</div><div class="num" id="kpi5">—</div><div class="delta">máx observado: <span id="kpi5b">—</span></div></div>
+    <div class="kpi red"><div class="lbl">Tasa de Scrap</div><div class="num" id="kpi6">—</div><div class="delta">sobre eventos de detalle</div></div>
+  </div>
+
+  <!-- SECTION 1: TENDENCIA -->
+  <div class="section-title"><span class="idx">01</span><h2>Tendencia de volumen</h2><span class="desc">Eventos de reparación en el tiempo</span></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Intakes de reparación por mes y turno</h3>
+      <div class="card-sub">Archivo A — RepairedByDateShiftModel</div>
+      <div class="filter-bar">
+        <span class="flabel">Turno:</span>
+        <span class="chip active" data-shift="all">Todos</span>
+        <span class="chip" data-shift="Turno 1">Turno 1</span>
+        <span class="chip" data-shift="Turno 2">Turno 2</span>
+        <span class="chip" data-shift="Turno 3">Turno 3</span>
+      </div>
+      <div class="chart-box"><canvas id="chartTrend"></canvas></div>
+      <div class="insight" id="insightTrend"></div>
+    </div>
+    <div class="card">
+      <h3>Volumen semanal de eventos de detalle</h3>
+      <div class="card-sub">Archivo B — abr-2026 a ago-2026 (registros previos excluidos por baja actividad)</div>
+      <div class="chart-box"><canvas id="chartWeekly"></canvas></div>
+      <div class="insight warn">Se excluyeron <b>15,894 registros</b> (7.8% del archivo B) anteriores a abril 2026 por ser un rezago disperso de muy baja actividad, previo al arranque intensivo real de la línea que coincide con el archivo de intake.</div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: DEFECTOS -->
+  <div class="section-title"><span class="idx">02</span><h2>Análisis de defectos</h2><span class="desc">Pareto y distribución por turno</span></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Pareto de defectos (Top 15)</h3>
+      <div class="card-sub">Archivo B — Defect Description, con % acumulado</div>
+      <div class="chart-box tall"><canvas id="chartPareto"></canvas></div>
+      <div class="insight" id="insightPareto"></div>
+    </div>
+    <div class="card">
+      <h3>Top defectos por turno</h3>
+      <div class="card-sub">Archivo A — comparación entre turnos</div>
+      <div class="chart-box tall"><canvas id="chartShiftDefect"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: CORRELACIÓN REPAIR COUNT / OUTCOME -->
+  <div class="section-title"><span class="idx">03</span><h2>Reincidencia vs. resultado final</h2><span class="desc">La variable más predictiva del dataset fusionado</span></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>% Scrap y % Fail según número de reparaciones (Repair Count)</h3>
+      <div class="card-sub">Archivo B — estado final por unidad, agrupado por veces reparada</div>
+      <div class="chart-box tall"><canvas id="chartRCOutcome"></canvas></div>
+      <div class="insight crit"><b>Hallazgo clave:</b> el % de Scrap sube de <b>0.2%</b> (1 reparación) a <b>1.7%</b> (11+ reparaciones), y el % de Fail sube de 0.5% a 4.7%. Una unidad reparada 11+ veces tiene ~8.5x más probabilidad de terminar en Scrap que una reparada solo una vez.</div>
+    </div>
+    <div class="card">
+      <h3>Distribución de unidades por Repair Count</h3>
+      <div class="card-sub">Volumen de unidades en cada bucket de reincidencia</div>
+      <div class="chart-box tall"><canvas id="chartRCVolume"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid3" style="margin-top:14px;">
+    <div class="card">
+      <h3>Generación de prueba (cronicidad)</h3>
+      <div class="card-sub">Archivo A — Test Generation por unidad</div>
+      <div class="chart-box short"><canvas id="chartGen"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Estado final de las unidades</h3>
+      <div class="card-sub">Archivo B — último Current Unit State</div>
+      <div class="chart-box short"><canvas id="chartOutcome"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Acción de reparación aplicada</h3>
+      <div class="card-sub">Archivo B — Rework Action Code</div>
+      <div class="chart-box short"><canvas id="chartRework"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: ESTACIONES -->
+  <div class="section-title"><span class="idx">04</span><h2>Estaciones de falla y reparación</h2><span class="desc">Dónde ocurren y dónde se resuelven los defectos</span></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Top estaciones de falla (Failure Station)</h3>
+      <div class="card-sub">Archivo B — donde se detecta el defecto</div>
+      <div class="chart-box tall"><canvas id="chartFailStation"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Top estaciones de reparación (Repair Station)</h3>
+      <div class="card-sub">Archivo B — donde se resuelve el defecto</div>
+      <div class="chart-box tall"><canvas id="chartRepairStation"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: PART NUMBER -->
+  <div class="section-title"><span class="idx">05</span><h2>Rendimiento por número de parte</h2><span class="desc">Top 10 part numbers — fusión completa A+B</span></div>
+  <div class="card">
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Part Number</th><th>Eventos de defecto</th><th>Unidades únicas</th><th>Repair Count prom.</th><th>Tasa de Scrap</th>
+        </tr></thead>
+        <tbody id="tblParts"></tbody>
+      </table>
+    </div>
+    <div class="insight"><b>Lectura:</b> <span id="insightParts"></span></div>
+  </div>
+
+  <!-- SECTION 6: AGING & TECNICOS -->
+  <div class="section-title"><span class="idx">06</span><h2>Tiempo de resolución y equipo técnico</h2><span class="desc">Aging por tipo de defecto y carga por técnico</span></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Aging promedio (días) por tipo de defecto</h3>
+      <div class="card-sub">Archivo A — defectos con ≥200 observaciones, más lentos de resolver</div>
+      <div class="chart-box tall"><canvas id="chartAging"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Top 12 técnicos por volumen de eventos</h3>
+      <div class="card-sub">Archivo B — Employee, eventos vs unidades únicas atendidas</div>
+      <div class="chart-box tall"><canvas id="chartEmployee"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SECTION 7: UNIDADES PROBLEMATICAS -->
+  <div class="section-title"><span class="idx">07</span><h2>Unidades más problemáticas</h2><span class="desc">Fusión directa por Serial Number — top 25 por Repair Count</span></div>
+  <div class="card">
+    <div class="filter-bar">
+      <span class="flabel">Buscar SN o parte:</span>
+      <input type="text" class="search" id="unitSearch" placeholder="ej. GFSFLG2612...">
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Serial Number</th><th>Part Number</th><th>Eventos Intake (A)</th><th>Eventos Detalle (B)</th><th>Repair Count máx</th><th>Defectos distintos</th><th>Aging prom.</th><th>Estado final</th>
+        </tr></thead>
+        <tbody id="tblUnits"></tbody>
+      </table>
+    </div>
+    <div class="insight warn"><b>Nota:</b> estas unidades fueron reparadas entre 23 y 54 veces y presentan hasta 21 tipos de defecto distintos. La gran mayoría termina en <b>Pass</b>, lo cual confirma que el proceso de reparación es efectivo, pero a un costo de reincidencia muy alto — candidatas ideales para un análisis de causa raíz dedicado.</div>
+  </div>
+
+  <footer>
+    <span>Fuente: RepairedByDateShiftModel.xlsx (61,023 filas) + PhiloVLP_RepairDetail.xlsx (204,044 filas) · fusionadas por Serial Number / Unit SN</span>
+    <span id="mergeFooter">—</span>
+  </footer>
+
+</div>
+
+<script src="assets/vendor/chart.umd.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
